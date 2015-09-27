@@ -11,6 +11,10 @@ fmt.Println(mnemonic.ListToString(words))
 `words` will be an array of strings, and ListToString() will turn that into a single string:
 `also twelve mirror crumble above pretty debate review outside require tribe flight`
 
+The generated key can later be regenerated from the word list:
+```
+key := mnemonic.SeedFromWordsPassword("aPassword")
+```
 
 # Short, memorable nickname for key (or data)
 Simple function for representing arbitrary data as a memorable (animal based) string. The generated string can not be used to recover any part of the original data.

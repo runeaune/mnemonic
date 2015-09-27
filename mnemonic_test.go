@@ -75,7 +75,7 @@ func TestMnemonicGeneration(t *testing.T) {
 			t.Fatalf("Test %d: Checksum mismatch.", i)
 		}
 
-		_, key, err := m.GenerateSeedWithPassword("TREZOR")
+		words, key, err := m.GenerateSeedWithPassword("TREZOR")
 		if err != nil {
 			t.Fatalf("Test %d: Failed to generator seed: %v", i, err)
 		}
@@ -83,6 +83,12 @@ func TestMnemonicGeneration(t *testing.T) {
 		if encoded != test[2] {
 			t.Errorf("Test %d: Key doesn't match: Got %q, expected %q.",
 				i, encoded, test[2])
+		}
+		key2 := mnemonic.SeedFromWordsPassword(words, "TREZOR")
+		encoded2 := hex.EncodeToString(key2)
+		if encoded2 != encoded {
+			t.Errorf("Test %d: Couldn't recover key: Got %x, expected %x.",
+				i, key2, key)
 		}
 
 	}
