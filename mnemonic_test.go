@@ -6,11 +6,8 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/aarbt/mnemonic"
 	"testing"
-)
-
-import (
-	"mnemonic"
 )
 
 type testSet struct {
@@ -18,7 +15,7 @@ type testSet struct {
 }
 
 func TestDictionaryLookup(t *testing.T) {
-	dict := mnemonic.NewDictionaryFromFileOrDie("wordlist.txt")
+	dict := mnemonic.DictionaryFromFileOrDie("wordlist.txt")
 	if dict.Size() != 2048 {
 		t.Fatalf("Unexpected dictionary size: %d", dict.Size())
 	}
@@ -43,7 +40,7 @@ func TestDictionaryLookup(t *testing.T) {
 }
 
 func TestMnemonicGeneration(t *testing.T) {
-	m := mnemonic.NewMnemonicWithWordfileOrDie("wordlist.txt")
+	m := mnemonic.NewFromFileOrDie("wordlist.txt")
 	file, err := ioutil.ReadFile("test_vectors.json")
 	if err != nil {
 		t.Fatalf("File error: %v\n", err)

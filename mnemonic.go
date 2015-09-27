@@ -1,176 +1,15 @@
 package mnemonic
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
 	"log"
-	"os"
-	"sort"
 
 	"golang.org/x/crypto/pbkdf2"
 )
-
-type BitField struct {
-	b    []byte
-	size int
-}
-
-func NewBitFieldFromBytes(b []byte) *BitField {
-	return &BitField{
-		b:    b,
-		size: len(b) * 8,
-	}
-}
-
-func (f *BitField) AppendUint(val uint64, size uint) {
-	for size > 0 {
-		spare := uint(len(f.b)*8 - f.size)
-
-		// Field is out of space, allocate another byte.
-		if spare == 0 {
-			f.b = append(f.b, 0)
-			spare = 8
-		}
-
-		bits := val
-		length := size
-		if spare < size {
-			// We don't have room for all the bits on this round.
-			length = spare
-			bits >>= (size - spare)
-		}
-
-		i := len(f.b) - 1
-		f.b[i] = f.b[i] | (byte(bits) << (spare - length))
-
-		// Filter out the bits just appended to the field.
-		val &= 1<<(size-length) - 1
-		size -= length
-		f.size += int(length)
-	}
-}
-
-func (f BitField) Bit(i uint) bool {
-	b := f.b[i/8]
-	filter := byte(1 << (7 - (i % 8)))
-	if b&filter == 0 {
-		return false
-	} else {
-		return true
-	}
-}
-
-func (f BitField) Word(i, length int) (uint64, error) {
-	// TODO optimize this function.
-	var val uint64
-	if i < 0 {
-		return 0, fmt.Errorf("Index %d not supported, must be zero or positive.", i)
-	}
-	if length < 1 || length > 32 {
-		return 0, fmt.Errorf("Length %d not supported, must be between 1 and 32 inclusive.",
-			length)
-	}
-	if i+length > f.size {
-		return 0, fmt.Errorf("Index + length is out of bounds (%d + %d > %d.",
-			i, length, f.size)
-	}
-	for length > 0 {
-		length--
-		if f.Bit(uint(i)) {
-			val += (1 << uint(length))
-		}
-		i++
-	}
-	return val, nil
-}
-
-func (f BitField) SplitOutWords(length int) ([]uint64, error) {
-	var list []uint64
-	for i := 0; i < f.size; i += length {
-		word, err := f.Word(i, length)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to get word number %d: %v", i, err)
-		}
-		list = append(list, word)
-	}
-	return list, nil
-}
-
-func (f BitField) Size() int {
-	return f.size
-}
-
-func (f BitField) Bytes() []byte {
-	return f.b
-}
-
-func (f BitField) String() string {
-	str := ""
-	for i := 0; i < f.size; i++ {
-		if f.Bit(uint(i)) {
-			str = str + "1"
-		} else {
-			str = str + "0"
-		}
-		if i%4 == 3 {
-			str = str + " "
-		}
-	}
-	return str
-}
-
-type Dictionary struct {
-	dict []string
-}
-
-func (d *Dictionary) LoadFromFile(path string) error {
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		d.dict = append(d.dict, scanner.Text())
-	}
-	if !sort.StringsAreSorted(d.dict) {
-		return fmt.Errorf("Words in file are not sorted.")
-	}
-	return scanner.Err()
-}
-
-func NewDictionaryFromFileOrDie(path string) *Dictionary {
-	d := &Dictionary{}
-	err := d.LoadFromFile(path)
-	if err != nil {
-		log.Fatal("Failed to load dictionary: %v", err)
-	}
-	return d
-}
-
-func (d Dictionary) Size() int {
-	return len(d.dict)
-}
-
-func (d Dictionary) Word(i int) (string, error) {
-	if i < 0 || i >= len(d.dict) {
-		return "", fmt.Errorf("Index %d out of bounds.", i)
-	}
-	return d.dict[i], nil
-}
-
-func (d Dictionary) Index(word string) (int, error) {
-	i := sort.SearchStrings(d.dict, word)
-	if i >= len(d.dict) || d.dict[i] != word {
-		return -1, fmt.Errorf("Word %q not found.", word)
-	}
-	return i, nil
-}
 
 func ListToString(list []string) string {
 	var buffer bytes.Buffer
@@ -190,8 +29,10 @@ type Mnemonic struct {
 	lastWords  []string
 }
 
-func NewMnemonicWithWordfileOrDie(path string) *Mnemonic {
-	dict := NewDictionaryFromFileOrDie(path)
+// NewFromFileOrDie generates a mnemonic object based on the words from the
+// file provided. Failure to load the words is a fatal error.
+func NewFromFileOrDie(path string) *Mnemonic {
+	dict := DictionaryFromFileOrDie(path)
 	size := dict.Size()
 	if size == 0 || size&(size-1) != 0 {
 		log.Fatalf("Unsupported dictionary size %d; must be power of two.", size)
@@ -211,11 +52,11 @@ func (m *Mnemonic) GenerateFromData(data []byte) ([]string, error) {
 		return nil, fmt.Errorf("Data length must be divisible by 4 (%d isn't).",
 			len(data))
 	}
-	f := NewBitFieldFromBytes(data)
+	f := bitFieldFromBytes(data)
 	hash := sha256.Sum256(data)
 	hashBitCount := uint(len(data) / 4)
 	hashBits := uint64(hash[0] >> (8 - hashBitCount))
-	f.AppendUint(hashBits, hashBitCount)
+	f.appendUint(hashBits, hashBitCount)
 
 	// bit_count * (33 / 32) must be a multiple of wordLength
 	if (uint(len(data)*8)+hashBitCount)%uint(m.wordLength) != 0 {
@@ -238,6 +79,9 @@ func (m *Mnemonic) GenerateFromData(data []byte) ([]string, error) {
 
 }
 
+// GenerateEntropy generates a list of random words from the loaded dictionary
+// corresponding to given number of bits of entropy plus a checksum. The bits
+// of entropy must be divisble with 32.
 func (m *Mnemonic) GenerateEntropy(bits int) ([]string, error) {
 	if bits%32 != 0 {
 		return nil, fmt.Errorf("Entropy size must be divisible by 32 (%d isn't).",
@@ -251,6 +95,10 @@ func (m *Mnemonic) GenerateEntropy(bits int) ([]string, error) {
 	return m.GenerateFromData(data)
 }
 
+// GenerateWords generates count random words, corresponding to count *
+// dictionary_bits (number of bits of entropy in the dictionary, eg. 11 for a
+// dictionary with 2048 words). The count must be divisible with
+// 33/dictionary_bits (3 for dictionary with 2048 words).
 func (m *Mnemonic) GenerateWords(count int) ([]string, error) {
 	entropy := count * m.wordLength
 	if entropy%33 != 0 {
@@ -260,28 +108,39 @@ func (m *Mnemonic) GenerateWords(count int) ([]string, error) {
 	return m.GenerateEntropy(32 * entropy / 33)
 }
 
-func (m *Mnemonic) VerifyChecksum(words []string) (bool, error) {
-	f := BitField{}
+func (m *Mnemonic) getDataChecksum(words []string) ([]byte, uint64, int, error) {
+	f := bitField{}
 	for _, word := range words {
 		index, err := m.dict.Index(word)
 		if err != nil {
-			return false, fmt.Errorf("Word not found in dictionary: %v", err)
+			return nil, 0, 0, fmt.Errorf("Word not found in dictionary: %v", err)
 		}
-		f.AppendUint(uint64(index), uint(m.wordLength))
+		f.appendUint(uint64(index), uint(m.wordLength))
 	}
 
 	checksumLength := f.Size() / 33
 	dataLength := f.Size() - checksumLength
-	checksum, err := f.Word(dataLength, checksumLength)
+	checksum, err := f.word(dataLength, checksumLength)
 	if err != nil {
-		return false, fmt.Errorf("Failed to get word from bitfield: %v", err)
+		return nil, 0, 0, fmt.Errorf("Failed to get word from bitfield: %v", err)
 	}
 	if dataLength%8 != 0 {
-		return false, fmt.Errorf("Can't verify checksum on partial bytes.")
+		return nil, 0, 0, fmt.Errorf("Can't verify checksum on partial bytes.")
 	}
 
 	data := f.Bytes()
-	hash := sha256.Sum256(data[0 : dataLength/8])
+	return data[0 : dataLength/8], checksum, checksumLength, nil
+}
+
+// VerifyChecksum checks that the list of words given correspond to data with a
+// valid checksum. If this is the case, they were likely generated using the
+// BIP-0039 algorithm.
+func (m *Mnemonic) VerifyChecksum(words []string) (bool, error) {
+	data, checksum, checksumLength, err := m.getDataChecksum(words)
+	if err != nil {
+		return false, err
+	}
+	hash := sha256.Sum256(data)
 	hashBits := uint64(hash[0] >> uint(8-checksumLength))
 	if hashBits == checksum {
 		return true, nil
@@ -290,9 +149,17 @@ func (m *Mnemonic) VerifyChecksum(words []string) (bool, error) {
 	}
 }
 
-// Generate a 512 bit (64 byte) key based on the last generated words and
-// encrypted with a password. If no words have been generated, new ones will
-// be generated with 256 bits of entropy.
+// SeedFromWordsPassword generates a 512 bit key seed from the word list and
+// password provided.
+func SeedFromWordsPassword(words []string, password string) []byte {
+	phrase := []byte(ListToString(words))
+	salt := []byte("mnemonic" + password)
+	return pbkdf2.Key(phrase, salt, 2048, 64, sha512.New)
+}
+
+// GenerateSeedWithPassword generates a 512 bit (64 byte) key based on the last
+// generated words and encrypted with a password. If no words have been
+// generated, new ones will be generated with 256 bits of entropy.
 func (m *Mnemonic) GenerateSeedWithPassword(password string) ([]string, []byte, error) {
 	if m.lastWords == nil {
 		_, err := m.GenerateEntropy(256)
@@ -300,7 +167,6 @@ func (m *Mnemonic) GenerateSeedWithPassword(password string) ([]string, []byte, 
 			return nil, nil, fmt.Errorf("Seed generation failed: %v", err)
 		}
 	}
-	phrase := []byte(ListToString(m.lastWords))
-	salt := []byte("mnemonic" + password)
-	return m.lastWords, pbkdf2.Key(phrase, salt, 2048, 64, sha512.New), nil
+	seed := SeedFromWordsPassword(m.lastWords, password)
+	return m.lastWords, seed, nil
 }

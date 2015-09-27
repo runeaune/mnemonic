@@ -23,7 +23,7 @@ func main() {
 	} else {
 		fmt.Printf("Not using any password.\n")
 	}
-	m := mnemonic.NewMnemonicWithWordfileOrDie(*wordFile)
+	m := mnemonic.NewFromFileOrDie(*wordFile)
 
 	var err error
 	if *wordCount != 0 {
