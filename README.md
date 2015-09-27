@@ -1,4 +1,4 @@
-==bitcoin-mnemonic (BIP-0039)==
+# Bitcoin Mnemonic (BIP-0039)
 Functions for generating random seeds and representing them as dictionary words according to BIP-0039 (Mnemonic code for generating deterministic keys -- https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki). The word list can be used to recover the generated seed, potentially requiring a password.
 
 ```
@@ -12,7 +12,7 @@ fmt.Println(mnemonic.ListToString(words))
 `also twelve mirror crumble above pretty debate review outside require tribe flight`
 
 
-==nicknames==
+# Short, memorable nickname for key (or data)
 Simple function for representing arbitrary data as a memorable (animal based) string. The generated string can not be used to recover any part of the original data.
 
 ```
