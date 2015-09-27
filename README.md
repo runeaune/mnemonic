@@ -13,7 +13,7 @@ fmt.Println(mnemonic.ListToString(words))
 
 The generated key can later be regenerated from the word list:
 ```
-key := mnemonic.SeedFromWordsPassword("aPassword")
+key := mnemonic.SeedFromWordsPassword(words, "aPassword")
 ```
 
 # Short, memorable nickname for key (or data)
