@@ -152,9 +152,14 @@ func (m *Mnemonic) VerifyChecksum(words []string) (bool, error) {
 // SeedFromWordsPassword generates a 512 bit key seed from the word list and
 // password provided.
 func SeedFromWordsPassword(words []string, password string) []byte {
-	phrase := []byte(ListToString(words))
+	return SeedFromPhrasePassword(ListToString(words), password)
+}
+
+// SeedFromWordsPassword generates a 512 bit key seed from the phrase and
+// password provided.
+func SeedFromPhrasePassword(phrase, password string) []byte {
 	salt := []byte("mnemonic" + password)
-	return pbkdf2.Key(phrase, salt, 2048, 64, sha512.New)
+	return pbkdf2.Key([]byte(phrase), salt, 2048, 64, sha512.New)
 }
 
 // GenerateSeedWithPassword generates a 512 bit (64 byte) key based on the last
