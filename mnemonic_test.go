@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/aarbt/mnemonic"
+	"github.com/runeaune/mnemonic"
 	"testing"
 )
 

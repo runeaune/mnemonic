@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/aarbt/mnemonic"
+	"github.com/runeaune/mnemonic"
 )
 
 var entropySize = flag.Int("entropy_size", 256, "Number of bits of entropy used to generate phrase. Must be multiple of 32. Defaults to 256.")
