@@ -49,8 +49,8 @@ func NewFromFileOrDie(path string) *Mnemonic {
 	}
 }
 
-// NewFromArray generates a mnemonic object from the array of provided words
-func NewFromArray(words []string) *Mnemonic {
+// NewFromArrayOrDie generates a mnemonic object from the array of provided words
+func NewFromArrayOrDie(words []string) *Mnemonic {
 	dict := DictionaryFromArrayOrDie(words)
 	size := dict.Size()
 	if size == 0 || size&(size-1) != 0 {

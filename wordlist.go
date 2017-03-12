@@ -1,7 +1,7 @@
 package mnemonic
 
-// defaultWords to avoid file loading / allow packaging in the app binary
-var defaultWords = []string{
+// DefaultWordlist to avoid file loading / allow packaging in the app binary
+var DefaultWordlist = []string{
 	"abandon",
 	"ability",
 	"able",
