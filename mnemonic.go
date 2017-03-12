@@ -11,6 +11,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
+// ListToString converts a list of strings to a space separated string
 func ListToString(list []string) string {
 	var buffer bytes.Buffer
 	for i, str := range list {
@@ -22,6 +23,7 @@ func ListToString(list []string) string {
 	return buffer.String()
 }
 
+// Mnemonic object
 type Mnemonic struct {
 	// TODO Add entropy source selection
 	dict       *Dictionary
@@ -47,9 +49,27 @@ func NewFromFileOrDie(path string) *Mnemonic {
 	}
 }
 
+// NewFromArray generates a mnemonic object from the array of provided words
+func NewFromArray(words []string) *Mnemonic {
+	dict := DictionaryFromArrayOrDie(words)
+	size := dict.Size()
+	if size == 0 || size&(size-1) != 0 {
+		log.Fatalf("unsupported dictionary size %d; must be power of two", size)
+	}
+	var bits int
+	for ; size > 1; size >>= 1 {
+		bits++
+	}
+	return &Mnemonic{
+		dict:       dict,
+		wordLength: bits,
+	}
+}
+
+// GenerateFromData generates a mnemonic from the provided data array
 func (m *Mnemonic) GenerateFromData(data []byte) ([]string, error) {
 	if len(data)%4 != 0 {
-		return nil, fmt.Errorf("Data length must be divisible by 4 (%d isn't).",
+		return nil, fmt.Errorf("data length must be divisible by 4 (%d isn't)",
 			len(data))
 	}
 	f := bitFieldFromBytes(data)
@@ -60,17 +80,17 @@ func (m *Mnemonic) GenerateFromData(data []byte) ([]string, error) {
 
 	// bit_count * (33 / 32) must be a multiple of wordLength
 	if (uint(len(data)*8)+hashBitCount)%uint(m.wordLength) != 0 {
-		return nil, fmt.Errorf("Entropy size not divisible with word length.")
+		return nil, fmt.Errorf("entropy size not divisible with word length")
 	}
-	vals, err := f.SplitOutWords(m.wordLength)
+	values, err := f.SplitOutWords(m.wordLength)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to divide into words: %v", err)
+		return nil, fmt.Errorf("failed to divide into words: %v", err)
 	}
-	words := make([]string, len(vals))
-	for i, w := range vals {
+	words := make([]string, len(values))
+	for i, w := range values {
 		words[i], err = m.dict.Word(int(w))
 		if err != nil {
-			return nil, fmt.Errorf("Look up dictionary word with index %d: %v",
+			return nil, fmt.Errorf("look up dictionary word with index %d: %v",
 				w, err)
 		}
 	}
@@ -81,16 +101,16 @@ func (m *Mnemonic) GenerateFromData(data []byte) ([]string, error) {
 
 // GenerateEntropy generates a list of random words from the loaded dictionary
 // corresponding to given number of bits of entropy plus a checksum. The bits
-// of entropy must be divisble with 32.
+// of entropy must be divisible with 32.
 func (m *Mnemonic) GenerateEntropy(bits int) ([]string, error) {
 	if bits%32 != 0 {
-		return nil, fmt.Errorf("Entropy size must be divisible by 32 (%d isn't).",
+		return nil, fmt.Errorf("entropy size must be divisible by 32 (%d isn't)",
 			bits)
 	}
 	data := make([]byte, bits/8)
 	_, err := rand.Read(data)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to generate seed data: %v", err)
+		return nil, fmt.Errorf("failed to generate seed data: %v", err)
 	}
 	return m.GenerateFromData(data)
 }
@@ -102,7 +122,7 @@ func (m *Mnemonic) GenerateEntropy(bits int) ([]string, error) {
 func (m *Mnemonic) GenerateWords(count int) ([]string, error) {
 	entropy := count * m.wordLength
 	if entropy%33 != 0 {
-		return nil, fmt.Errorf("Word count needs to be divisible by %d.",
+		return nil, fmt.Errorf("word count needs to be divisible by %d",
 			33/m.wordLength)
 	}
 	return m.GenerateEntropy(32 * entropy / 33)
@@ -113,7 +133,7 @@ func (m *Mnemonic) getDataChecksum(words []string) ([]byte, uint64, int, error) 
 	for _, word := range words {
 		index, err := m.dict.Index(word)
 		if err != nil {
-			return nil, 0, 0, fmt.Errorf("Word not found in dictionary: %v", err)
+			return nil, 0, 0, fmt.Errorf("word not found in dictionary: %v", err)
 		}
 		f.appendUint(uint64(index), uint(m.wordLength))
 	}
@@ -122,10 +142,10 @@ func (m *Mnemonic) getDataChecksum(words []string) ([]byte, uint64, int, error) 
 	dataLength := f.Size() - checksumLength
 	checksum, err := f.word(dataLength, checksumLength)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("Failed to get word from bitfield: %v", err)
+		return nil, 0, 0, fmt.Errorf("failed to get word from bitfield: %v", err)
 	}
 	if dataLength%8 != 0 {
-		return nil, 0, 0, fmt.Errorf("Can't verify checksum on partial bytes.")
+		return nil, 0, 0, fmt.Errorf("can't verify checksum on partial bytes")
 	}
 
 	data := f.Bytes()
@@ -144,9 +164,9 @@ func (m *Mnemonic) VerifyChecksum(words []string) (bool, error) {
 	hashBits := uint64(hash[0] >> uint(8-checksumLength))
 	if hashBits == checksum {
 		return true, nil
-	} else {
-		return false, nil
 	}
+
+	return false, nil
 }
 
 // SeedFromWordsPassword generates a 512 bit key seed from the word list and
@@ -155,7 +175,7 @@ func SeedFromWordsPassword(words []string, password string) []byte {
 	return SeedFromPhrasePassword(ListToString(words), password)
 }
 
-// SeedFromWordsPassword generates a 512 bit key seed from the phrase and
+// SeedFromPhrasePassword generates a 512 bit key seed from the phrase and
 // password provided.
 func SeedFromPhrasePassword(phrase, password string) []byte {
 	salt := []byte("mnemonic" + password)
