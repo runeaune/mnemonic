@@ -1,4 +1,4 @@
-package mnemonic_test
+package mnemonic
 
 import (
 	"encoding/hex"
@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/runeaune/mnemonic"
 	"testing"
 )
 
@@ -15,7 +14,7 @@ type testSet struct {
 }
 
 func TestDictionaryLookup(t *testing.T) {
-	dict := mnemonic.DictionaryFromFileOrDie("wordlist.txt")
+	dict := DictionaryFromFileOrDie("wordlist.txt")
 	if dict.Size() != 2048 {
 		t.Fatalf("Unexpected dictionary size: %d", dict.Size())
 	}
@@ -40,7 +39,8 @@ func TestDictionaryLookup(t *testing.T) {
 }
 
 func TestMnemonicGeneration(t *testing.T) {
-	m := mnemonic.NewFromFileOrDie("wordlist.txt")
+	m := NewFromFileOrDie("wordlist.txt")
+	//m := NewFromArrayOrDie(DefaultWordlist)
 	file, err := ioutil.ReadFile("test_vectors.json")
 	if err != nil {
 		t.Fatalf("File error: %v\n", err)
@@ -62,7 +62,7 @@ func TestMnemonicGeneration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Test %d: Failed to generator words: %v", i, err)
 		}
-		str := mnemonic.ListToString(words)
+		str := ListToString(words)
 		if str != test[1] {
 			t.Errorf("Test %d: Words don't match: Got %q, expected %q.",
 				i, str, test[1])
@@ -84,7 +84,7 @@ func TestMnemonicGeneration(t *testing.T) {
 			t.Errorf("Test %d: Key doesn't match: Got %q, expected %q.",
 				i, encoded, test[2])
 		}
-		key2 := mnemonic.SeedFromWordsPassword(words, "TREZOR")
+		key2 := SeedFromWordsPassword(words, "TREZOR")
 		encoded2 := hex.EncodeToString(key2)
 		if encoded2 != encoded {
 			t.Errorf("Test %d: Couldn't recover key: Got %x, expected %x.",
