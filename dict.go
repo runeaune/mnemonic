@@ -52,6 +52,11 @@ func DictionaryFromFileOrDie(path string) *Dictionary {
 	return d
 }
 
+func DictionaryFromFile(path string) (d *Dictionary, err error) {
+	err = d.LoadFromFile(path)
+	return
+}
+
 // DictionaryFromArrayOrDie loads a wordlist from the provided array and panics on errors
 func DictionaryFromArrayOrDie(words []string) *Dictionary {
 	d := &Dictionary{}
