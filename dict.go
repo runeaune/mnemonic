@@ -53,6 +53,7 @@ func DictionaryFromFileOrDie(path string) *Dictionary {
 }
 
 func DictionaryFromFile(path string) (d *Dictionary, err error) {
+	d = &Dictionary{}
 	err = d.LoadFromFile(path)
 	return
 }
