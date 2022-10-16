@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
+	"errors"
 	"fmt"
 	"log"
 
@@ -29,6 +30,27 @@ type Mnemonic struct {
 	dict       *Dictionary
 	wordLength int
 	lastWords  []string
+}
+
+func NewFromFile(path string) (m *Mnemonic, err error) {
+	dict, err := DictionaryFromFile(path)
+	if err != nil {
+		return
+	}
+
+	size := dict.Size()
+	if size == 0 || size&(size-1) != 0 {
+		err = errors.New(fmt.Sprintf("Unsupported dictionary size %d; must be power of two.", size))
+		return
+	}
+	var bits int
+	for ; size > 1; size >>= 1 {
+		bits++
+	}
+	return &Mnemonic{
+		dict:       dict,
+		wordLength: bits,
+	}, nil
 }
 
 // NewFromFileOrDie generates a mnemonic object based on the words from the
